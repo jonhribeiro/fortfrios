@@ -1,0 +1,87 @@
+version: "3.8"
+
+services:
+    # image project
+    app:
+      build:
+          context: .
+          dockerfile: Dockerfile
+      image: frios
+      restart: unless-stopped
+      working_dir: /var/www/
+      volumes:
+        - ./:/var/www
+      depends_on: 
+        - redis
+      networks: 
+        - internal
+    
+    # nginx
+    nginx:
+        image: nginx:alpine
+        restart: unless-stopped
+        ports: 
+            - "8989:80"
+        volumes: 
+            - ./:/var/www
+            - ./docker/nginx/:/etc/nginx/conf.d/
+        networks: 
+            - internal
+
+    mariadb:
+        image: mariadb:10.7
+        restart: unless-stopped
+        environment: 
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+        volumes: 
+            - ./.docker/mariadb/dbdata:/var/lib/mysql
+        ports: 
+            - "3308:3306"
+        networks: 
+            - internal
+
+    # queue
+    queue:
+      image: frios
+      restart: unless-stopped
+      command: "php artisan queue:work"
+      volumes: 
+        - ./:/var/www
+      depends_on: 
+        - redis
+        - app
+      networks: 
+        - internal
+
+    # redis
+    redis:
+        image: redis:latest
+        networks: 
+            - internal
+
+    # install mongodb
+    mongo:
+        image: mongo:5.0.5
+        restart: unless-stopped
+        ports:
+            - "27017:27017"
+        volumes:
+            - ./.docker/mongodb/dbdata:/data/db
+        networks:
+            - internal
+    
+    mailhog:
+        image: mailhog/mailhog:v1.0.1
+        restart: unless-stopped
+        ports: 
+            - 8025:8025
+        networks: 
+            - internal
+
+networks: 
+    internal:
+        driver: bridge
+
